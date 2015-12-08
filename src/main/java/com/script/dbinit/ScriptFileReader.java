@@ -46,6 +46,7 @@ public class ScriptFileReader
                 List<String> majors = new ArrayList<String>();
                 List<String> learningOutcomes = new ArrayList<String>();
                 List<String> skills = new ArrayList<String>();
+                List<String> recurrence = new ArrayList<String>();
                 
                 String[] opportunityUnparsed = line.split(splitBy);
                 // for each field in the current opportunity
@@ -74,6 +75,10 @@ public class ScriptFileReader
                    {
                        skills.add(fieldUnparsed[1]);
                    }
+                   else if (fieldUnparsed[0].equals("recurrence"))
+                   {
+                       recurrence.add(fieldUnparsed[1]);
+                   }
                    // for all other fields, create a new entry in the HashMap
                    else
                    {
@@ -92,6 +97,7 @@ public class ScriptFileReader
                 parsedOpportunity.put("majors", majors);
                 parsedOpportunity.put("learningOutcomes", learningOutcomes);
                 parsedOpportunity.put("skills", skills);
+                parsedOpportunity.put("recurrence", recurrence);
                 
                 parsedOpportunities.add(parsedOpportunity);
             }
