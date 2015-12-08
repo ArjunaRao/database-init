@@ -1,8 +1,12 @@
 import java.io.File;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -10,7 +14,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.Writer;
+import com.google.zxing.WriterException;
+import com.google.zxing.client.j2se.MatrixToImageWriter;
+import com.google.zxing.common.BitMatrix;
+import com.google.zxing.qrcode.QRCodeWriter;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
 import com.mongodb.DBCollection;
@@ -19,13 +32,17 @@ import com.mongodb.MongoClientURI;
 import com.mongodb.MongoCredential;
 import com.mongodb.ServerAddress;
 
+
 public class DatabaseInitMain
 {
+    private static Logger LOG = LoggerFactory.getLogger(DatabaseInitMain.class);
+    
     public static final int ONLY_ONE_HOST = 1;
     public static final int INDEX_OF_URI = 0;
     public static final int INDEX_OF_CSV = 1;
     public static final int HOST = 0;
     public static final int PORT = 1;
+    public static String OUTPUT_PATH = "";
     
     
     public static void main( String[] args ) throws IOException, URISyntaxException
@@ -37,21 +54,29 @@ public class DatabaseInitMain
         // determine current working director
         URL location = DatabaseInitMain.class.getProtectionDomain().getCodeSource().getLocation();
         File file = new File(location.toURI());
-        String pathContainingJar = file.getParentFile().getParent();
+        OUTPUT_PATH = file.getParentFile().getParent();
         
         ScriptFileReader scriptFileReader =
-                new ScriptFileReader(pathContainingJar + "/" + args[INDEX_OF_CSV]);
+                new ScriptFileReader(OUTPUT_PATH + "/" + args[INDEX_OF_CSV]);
         
         List<HashMap<String, Object>> parsedOpportunities = scriptFileReader.read();
         
-//        ObjectMapper mapper = new ObjectMapper();
-//        String indented = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(parsedOpportunities.get(0));
-//        System.out.println(indented);
+        ObjectMapper mapper = new ObjectMapper();
+        String indented = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(parsedOpportunities.get(0));
+        System.out.println(indented);
         
         for (HashMap<String, Object> parsedOpportunity : parsedOpportunities)
         {
+            String opportunityId = (String)parsedOpportunity.get("opportunityId");
             saveToDatabase(parsedOpportunity, opportunitiesCollection);
-            // generate QR code
+            // generate QR BitMatrix
+            BitMatrix bitMatrix = generateQRCode(opportunityId);
+            if (bitMatrix == null)
+            {
+                LOG.error("Failed to properly generate QR BitMatrix");
+                continue;
+            }
+            generateQRCodeImage(bitMatrix, opportunityId);
         }
     }
     
@@ -68,9 +93,56 @@ public class DatabaseInitMain
         collection.save(opportunityObject);
     }
     
-    private void generateQRCode(String opportunityId)
+    private static BitMatrix generateQRCode(String opportunityId)
     {
-        
+        ByteBuffer inputBuffer = ByteBuffer.wrap(opportunityId.getBytes());
+        // decode UTF-8
+        CharBuffer decodedString = Charset.forName("UTF-8").decode(inputBuffer);
+        // encode ISO-8559-1
+        ByteBuffer outputBuffer = Charset.forName("ISO-8859-1").encode(decodedString);
+
+        String stringEncodedOpportunityId;
+        try
+        {
+            stringEncodedOpportunityId = new String(outputBuffer.array(), "ISO-8859-1");
+            int width = 200;
+            int height = 200;
+            Writer writer = new QRCodeWriter();
+            try
+            {
+                if (LOG.isInfoEnabled())
+                {
+                    LOG.info("Encoding QR BitMatrix for opportunityId=" + opportunityId);
+                }
+                return writer.encode(stringEncodedOpportunityId, BarcodeFormat.QR_CODE, width, height);
+            }
+            catch (WriterException e)
+            {
+                e.printStackTrace();
+                return null;
+            }
+        }
+        catch (UnsupportedEncodingException e1)
+        {
+            e1.printStackTrace();
+            return null;
+        }
+    }
+    
+    private static void generateQRCodeImage(BitMatrix bitMatrix, String opportunityId)
+    {
+        File qrCodesPath = new File(OUTPUT_PATH + "/QRCodes");
+        qrCodesPath.mkdir();
+        File file = new File(qrCodesPath + "/" + opportunityId + ".png");
+        try {
+            MatrixToImageWriter.writeToFile(bitMatrix, "PNG", file);
+            if (LOG.isInfoEnabled())
+            {
+                LOG.info("printing to " + file.getAbsolutePath());
+            }
+        } catch (IOException e) {
+            System.out.println(e.getMessage());
+        }
     }
     
     private static DB connectToMongo(String[] args) throws UnknownHostException

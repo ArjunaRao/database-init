@@ -3,7 +3,6 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 
@@ -28,7 +27,7 @@ public class ScriptFileReader
         try
         {
             bufferedReader = new BufferedReader(new FileReader(csvPath));
-            // this loop runs once for each entry (line) in the csv
+            // this loop runs once for each entry (line) in the tsv
             while ((line = bufferedReader.readLine()) != null)
             {
                 HashMap<String, Object> parsedOpportunity = new HashMap<String, Object>();
