@@ -32,7 +32,17 @@ import com.mongodb.MongoClientURI;
 import com.mongodb.MongoCredential;
 import com.mongodb.ServerAddress;
 
-
+/**
+ * Team 3 aka "Team Pick Two"
+ * DatabaseInitMain.java
+ * Purpose: Populates the opportunities collection using the given .tsv that
+ *          exists in the same directory as the jar.  Additionally, generates
+ *          QR codes for each opportunity saved to the database.  Thos are also
+ *          located in the same directory but in a folder 
+ * 
+ * @author arjunrao
+ * @version 1.0 12/8/15
+ */
 public class DatabaseInitMain
 {
     private static Logger LOG = LoggerFactory.getLogger(DatabaseInitMain.class);
@@ -44,7 +54,15 @@ public class DatabaseInitMain
     public static final int PORT = 1;
     public static String OUTPUT_PATH = "";
     
-    
+    /** main:   Connects to the mongoDB specified by args[0].  Parses the .tsv file
+     *          specified by args[1].  Saves each opportunity to the databse and generates
+     *          a QR code for each one saved.
+     * 
+     * @param args[0] mongoURI
+     * @param args[1] e.g "opportunities.tsv"
+     * @throws IOException
+     * @throws URISyntaxException
+     */
     public static void main( String[] args ) throws IOException, URISyntaxException
     {
         //establish database connection
@@ -61,13 +79,15 @@ public class DatabaseInitMain
         
         List<HashMap<String, Object>> parsedOpportunities = scriptFileReader.read();
         
-        ObjectMapper mapper = new ObjectMapper();
-        String indented = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(parsedOpportunities.get(0));
-        System.out.println(indented);
-        
         for (HashMap<String, Object> parsedOpportunity : parsedOpportunities)
         {
             String opportunityId = (String)parsedOpportunity.get("opportunityId");
+            if (LOG.isInfoEnabled())
+            {
+                ObjectMapper mapper = new ObjectMapper();
+                String indented = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(parsedOpportunity);
+                LOG.info("Processing opportunityId=" + opportunityId + "\n" + indented);
+            }
             saveToDatabase(parsedOpportunity, opportunitiesCollection);
             // generate QR BitMatrix
             BitMatrix bitMatrix = generateQRCode(opportunityId);
@@ -76,10 +96,17 @@ public class DatabaseInitMain
                 LOG.error("Failed to properly generate QR BitMatrix");
                 continue;
             }
+            // generateQRCodeImage
             generateQRCodeImage(bitMatrix, opportunityId);
         }
     }
     
+    /** saveToDatabase: Helper method that saves the given parsedOpportunity to the given
+     *                  database collection
+     * 
+     * @param parsedOpportunity
+     * @param collection
+     */
     private static void saveToDatabase(HashMap<String, Object> parsedOpportunity, DBCollection collection)
     {
         BasicDBObject opportunityObject = new BasicDBObject();
@@ -90,9 +117,19 @@ public class DatabaseInitMain
             opportunityObject.put(field.getKey(), field.getValue());
             iterator.remove();
         }
+        if (!opportunityObject.containsField("otherRequirements"))
+        {
+            opportunityObject.put("otherRequirements", "");
+        }
         collection.save(opportunityObject);
     }
     
+    /** generateQRCode: Helper method that encodes the given opportunityId as a QR code.
+     *                  Returns a BitMatrix to be turned into an image later.
+     * 
+     * @param opportunityId
+     * @return BitMatrix
+     */
     private static BitMatrix generateQRCode(String opportunityId)
     {
         ByteBuffer inputBuffer = ByteBuffer.wrap(opportunityId.getBytes());
@@ -129,6 +166,12 @@ public class DatabaseInitMain
         }
     }
     
+    /** generateQRCodeImage:    Helper method that generates an image with the given bitMatrix.
+     *                          Outputs the image to QRCodes/opportunityId.png
+     * 
+     * @param bitMatrix
+     * @param opportunityId
+     */
     private static void generateQRCodeImage(BitMatrix bitMatrix, String opportunityId)
     {
         File qrCodesPath = new File(OUTPUT_PATH + "/QRCodes");
@@ -145,6 +188,12 @@ public class DatabaseInitMain
         }
     }
     
+    /** connectToMongo: Helper method that establishes a connection to the mongo database
+     * 
+     * @param args
+     * @return DB
+     * @throws UnknownHostException
+     */
     private static DB connectToMongo(String[] args) throws UnknownHostException
     {
         if (args.length == 0)

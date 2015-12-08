@@ -6,6 +6,15 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
+/**
+ * Team 3 aka "Team Pick Two"
+ * ScriptFileReader.java
+ * Purpose: Reads and parses "opportunities" from a .tsv file where
+ *          each line is an opportunity.
+ * 
+ * @author arjunrao
+ * @version 1.0 12/8/15
+ */
 public class ScriptFileReader
 {
     private String csvPath;
@@ -67,7 +76,14 @@ public class ScriptFileReader
                    // for all other fields, create a new entry in the HashMap
                    else
                    {
-                       parsedOpportunity.put(fieldUnparsed[0], fieldUnparsed[1]);
+                       if (fieldUnparsed[1].equals("true") || fieldUnparsed[1].equals("false"))
+                       {
+                           parsedOpportunity.put(fieldUnparsed[0], Boolean.parseBoolean(fieldUnparsed[1]));
+                       }
+                       else
+                       {
+                           parsedOpportunity.put(fieldUnparsed[0], fieldUnparsed[1]);
+                       }
                    }
                 }
                 parsedOpportunity.put("topics", topics);
